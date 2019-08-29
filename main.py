@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-
+import statistics
+import math
 #--------------------------------------------------
 #**Part 1:**
 #1:Check DB Size + LRU DB Management
@@ -21,6 +22,7 @@ class db_content:
             self.timestamp    = list()
             self.idle_timeout = list()
             self.active_flag  = null
+            self.interval     = list() 
 db = {} #db init as dict
 
 #------------------------------------------------
@@ -31,12 +33,15 @@ Packet_out = 0      #一共處理了多少封包
 TCAM_Max = 2000     #TCAM能存儲2000條Flow_entries
 TCAM_Current = 0    #目前TCAM的佔用情況
 #------------------------------------------------
-
+#                                               #
+#                 Part 1 & 2                    #
+#                     CP                        #
+#------------------------------------------------
 def PacketProcessing():
     #取出封包中的欄位 --> SrcIP + DstIP 做HASH
     flow_id = hash(SrcIP + DstIP)
     
-def db_LRU(dict db)
+#def db_LRU(dict db)
 
 def CheckDBSize(dict db): 
     #DB size > threshold ?
@@ -71,9 +76,16 @@ def CheckInterval(dict db,float flow_id):
     tmp = db[flow_id].timestamp[len(db[flow_id].timestamp) - 1] #last time stamp
     print tmp
     if(time.time() - tmp < 11):
+        while(TCAM_Current >= TCAM_Max - 1 ):
+            #這條插入後會導致滿，則進行刪除
+            TCAM_Current = DeleteFlowEntry(db, TCAM_Current)
+
         if(TCAM_Current < TCAM_Max):
+            #install
             TCAM_Current = TCAM_Current + 1 
             #更新TCAM用量
+            db[flow_id].interval.clear()
+            #Clear interval list
             db[flow_id].active_flag = True
             #在DB中對已插入的flow做標記
         else:
@@ -82,17 +94,46 @@ def CheckInterval(dict db,float flow_id):
             
 
     else:
+        print("Cancel installaion of :"flow_id) #Print出取消插入的flow id
 
 def DeleteFlowEntry(dict db, int TCAM_Current):
     #找到DB中有active flag之最不常用的flow
-    DB SORT
+    DB SORT #需要根據timestamp排序，剔除最後的記錄
     #排序後進行刪除
     TCAM_Current = TCAM_Current - 1
+    return TCAM_Current
 
-def ProcessingRemovalMessage(dict db, float flow_id):
+def ProcessingRemovalMessage(dict db, float flow_id, float duration, int packet_count):
+    #update time stamp
     db[flow_id].timestamp.append(time.time())
+    #mark flow as inactive
     db[flow_id].active_flag = False
+    #free tcam spaces
     TCAM_Current = TCAM_Current - 1 
+    #Calculate time interval based last two timestamp
+    interval = db[flow_id].timestamp(len(db[flow_id].timestamp) - 1) - db[flow_id].timestamp(len(db[flow_id].timestamp) - 2)
+    #update interval
+    db[flow_id].interval.append(interval)
+
+    #check if len(interval) >= 6 --->Threshold 3
+    if(len(db[flow_id].interval) >= 6):
+        #calculate mean through interval list
+        mean = statistics.mean(db[flow_id].interval)
+        #Calculate variance through interval list
+        vairance = statistics.variance(db[flow_id].interval)
+        #get new idle timeout through 柴比雪夫
+        new_timeout = Chebyshev(mean, variance)
+        #update data to db
+        UpdateData(db, flow_id, new_timeout)
+
+#------------------------------------------------
+#                                               #
+#                   Part 3                      #
+#                   Switch                      #
+#------------------------------------------------
+
+
+
 
 if __name__ == '__main__':
     print
