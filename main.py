@@ -21,29 +21,38 @@ class db_content:
     def __init__(self):
             self.timestamp    = list()
             self.idle_timeout = list()
-            self.active_flag  = null
             self.interval     = list() 
+            self.active_flag  = none
+
 db = {} #db init as dict
 
 #------------------------------------------------
 #       Places to Declare Variable              #
 #------------------------------------------------
 db_threshold = 5000 #key的數量設定爲5000
-Packet_out = 0      #一共處理了多少封包
-TCAM_Max = 2000     #TCAM能存儲2000條Flow_entries
+Packet_out   = 0      #一共處理了多少封包
+TCAM_Max     = 2000     #TCAM能存儲2000條Flow_entries
 TCAM_Current = 0    #目前TCAM的佔用情況
-#------------------------------------------------
+#-----------------------------------------------#
 #                                               #
 #                 Part 1 & 2                    #
 #                     CP                        #
-#------------------------------------------------
+#-----------------------------------------------#
 def PacketProcessing():
+    
     #取出封包中的欄位 --> SrcIP + DstIP 做HASH
     flow_id = hash(SrcIP + DstIP)
+    return flow_id
     
-#def db_LRU(dict db)
 
-def CheckDBSize(dict db): 
+def db_LRU(dict db):
+    #Sorting according to last_timestamp
+    #Delete least recently use record from db
+    #return db after deletion
+    return db
+
+
+def CheckDB(dict db):
     #DB size > threshold ?
     if(db.size() > db_threshold):
         db_LRU(db)
@@ -52,15 +61,10 @@ def CheckDBSize(dict db):
         Packet_out += 1
         #Maintain packet out counter
             
-def db_LRU(dict db):
-    #Sorting according to last_timestamp
-    #Delete least recently use record from db
-    #return db after deletion
-    return db
 
 def CheckFlowExist_DB(String key, dict db): #Flow entry in DB ?
     #To check if DB has this flow record
-    if(flow_id) in db = True):
+    if(flow_id in db = True):
         UpdateData(db）#更新timestamp
     else:
         #Add record to DB
