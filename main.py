@@ -17,6 +17,26 @@ import math
 #
 #
 #
+class packet:
+    def __init__(self):
+        self.SrcIP      = None # 5 tuple - SrcIP
+        self.DstIP      = None # 5 tuple - DstIP
+        self.Priority   = None 
+        self.SrcPort    = None # 5 tuple - SrcPort
+        self.DstPort    = None # 5 tuple - DstPort
+        self.Protocol   = None # 5 tuple - Protocol
+
+
+class Switch_TCAM:
+    def __init__(self):
+        self.timestamp      = list()
+        self.idle_timeout   = None
+        self.packet_count   = None
+        self.duration       = None
+
+Switch = {}
+
+
 class db_content:
     def __init__(self):
             self.timestamp    = list()
@@ -24,7 +44,7 @@ class db_content:
             self.interval     = list() 
             self.active_flag  = none
 
-db = {} #db init as dict
+db = {} # db init as dict
 
 #------------------------------------------------
 #       Places to Declare Variable              #
@@ -41,11 +61,11 @@ TCAM_Current = 0    #目前TCAM的佔用情況
 def PacketProcessing():
     
     #取出封包中的欄位 --> SrcIP + DstIP 做HASH
-    flow_id = hash(SrcIP + DstIP)
+    flow_id = (SrcIP, DstIP, Priority)
     return flow_id
     
 
-def db_LRU(dict db):
+def LRU(dict db):
     #Sorting according to last_timestamp
     #Delete least recently use record from db
     #return db after deletion
@@ -55,7 +75,7 @@ def db_LRU(dict db):
 def CheckDB(dict db):
     #DB size > threshold ?
     if(db.size() > db_threshold):
-        db_LRU(db)
+        db = LRU(db)
         CheckDBSize(db)
     else:
         Packet_out += 1
@@ -135,6 +155,15 @@ def ProcessingRemovalMessage(dict db, float flow_id, float duration, int packet_
 #                   Part 3                      #
 #                   Switch                      #
 #------------------------------------------------
+def CheckFlowExist_SW(dict db):
+    #do sth here
+
+def install_to_sw(tuple flow_id,class packet):
+    Switch[flow_id] = Switch_TCAM()
+    
+    .timestamp    = time.time()
+    Switch[flow_id].packet_count = 0
+    Switch[flow_id].
 
 
 
