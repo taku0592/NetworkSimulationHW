@@ -42,7 +42,7 @@ class db_content:
             self.timestamp    = list()
             self.idle_timeout = list()
             self.interval     = list() 
-            self.active_flag  = none
+            self.active_flag  = None
 
 db = {} # db init as dict
 
@@ -53,6 +53,9 @@ db_threshold = 5000 #key的數量設定爲5000
 Packet_out   = 0      #一共處理了多少封包
 TCAM_Max     = 2000     #TCAM能存儲2000條Flow_entries
 TCAM_Current = 0    #目前TCAM的佔用情況
+Current_time = 0
+Sim_time     = 30*60 # 30 min
+timeline = [] #queue for schedule
 #-----------------------------------------------#
 #                                               #
 #                 Part 1 & 2                    #
@@ -69,6 +72,8 @@ def LRU(dict db):
     #Sorting according to last_timestamp
     #Delete least recently use record from db
     #return db after deletion
+    flow_id = sorted(db,lambda x:db[x].timestamp[-1])[0] # get flow_id
+    del db[flow_id]
     return db
 
 
@@ -77,6 +82,7 @@ def CheckDB(dict db):
     if(db.size() > db_threshold):
         db = LRU(db)
         CheckDBSize(db)
+
     else:
         Packet_out += 1
         #Maintain packet out counter
@@ -125,7 +131,7 @@ def DeleteFlowEntry(dict db, int TCAM_Current):
     #找到DB中有active flag之最不常用的flow
     DB SORT #需要根據timestamp排序，剔除最後的記錄
     #找到要删除的条目
-    Target = sorted(db.items(), key=lambda x: x[1]['ts'][-1])[0][0]
+    Target = sorted(db.items(), key=lambda x: x[1][-1])[0][0]
     del db[Target]
     TCAM_Current = len(db)
     return TCAM_Current, db
@@ -167,7 +173,7 @@ def CheckFlowExist_SW(dict db):
 #       self.packet_count   = None
 #       self.duration       = None
 
-def install_to_sw(tuple flow_id,class packet):
+def Install_Rule(tuple flow_id,class packet):
     Switch[flow_id]              = Switch_TCAM()
     Switch[flow_id].timestamp    = time.time()
     Switch[flow_id].packet_count = 0  # init as 0
@@ -178,10 +184,10 @@ def Del_Rule(dict switch, int TCAM_Max):
     
     if(TCAM_Current >= TCAM_Max):
         # TCAM Overflow occur
-        TCAM_Current, db = DeleteFlowEntry(switch)
-        flow_id = sorted(switch.items(), key=lambda x: x[1]['ts'][-1])[0][0]
+        switch = LRU(switch)
+        TCAM_Current = len(switch)
         #sorted by timestamps & find flow id to delete
-        del switch[flow_id]
+        
         #不用接，直接对字典进行操作
     
         return switch, TCAM_Current
@@ -194,11 +200,13 @@ TCAM_Current = len(Switch)
 while(TCAM_current >= TCAM_Max):
     switch,TCAM_Current = Del_Rule(switch, TCAM_Max)
 #---------------------------------------------------------------------
-    
+
+def ExpireEvent(Current_time):
+
     
 
 
 
 
 if __name__ == '__main__':
-    print
+    
