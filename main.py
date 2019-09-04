@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import statistics
 import math
+from heapq import heappush, heappop
 #--------------------------------------------------
 #**Part 1:**
 #1:Check DB Size + LRU DB Management
@@ -202,6 +203,7 @@ while(TCAM_current >= TCAM_Max):
 #---------------------------------------------------------------------
 
 def ExpireEvent(Current_time):
+    #写在event type中
 
     
 
@@ -209,4 +211,23 @@ def ExpireEvent(Current_time):
 
 
 if __name__ == '__main__':
+
+while(Current_time < Sim_time):
+    ts , p = heappop(timeline)
+
+    #update  current time
+
+
+    #Do sth
+
+    #update event
+    if p.event_type == "arrvial":
+        heappush(timeline, (ts + np.random.exponential(1), #对应obj)
+    if p.event_type == "install":
+        heappush(timeline, (ts + np.random.exponential(1), #对应obj)
+    if p.event_type == "expire":
+        if(time.time() - db[p.flow_id].timestamp[-1] < db[p.flow_id].idle_timeout):
+            heappush(timeline, #下次expire时间, #对应obj)
+        else:
+            db,TCAM_Current = Del_Rule(db,TCAM_Max)
     
