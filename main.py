@@ -26,6 +26,7 @@ class packet:
         self.SrcPort    = None # 5 tuple - SrcPort
         self.DstPort    = None # 5 tuple - DstPort
         self.Protocol   = None # 5 tuple - Protocol
+        self.event_type
 
 
 class Switch_TCAM:
@@ -62,10 +63,10 @@ timeline = [] #queue for schedule
 #                 Part 1 & 2                    #
 #                     CP                        #
 #-----------------------------------------------#
-def PacketProcessing():
-    
+def PacketProcessing(packet):
     #取出封包中的欄位 --> SrcIP + DstIP 做HASH
-    flow_id = (SrcIP, DstIP, Priority)
+    flow_id = (packet.SrcIP, packet.DstIP, packet.SrcPort, packet.DstPort, packet.Priority, packet.event_type)
+    #Set SrcIP, DstIP, SrcPort, DstPort, Priority, Event_type as flow_id
     return flow_id
     
 
@@ -82,24 +83,28 @@ def CheckDB(dict db):
     #DB size > threshold ?
     if(db.size() > db_threshold):
         db = LRU(db)
-        CheckDBSize(db)
+        CheckDB(db)
+        #检查DB空间直到符合要求
+        print("Checking DB Size...")
 
-    else:
-        Packet_out += 1
-        #Maintain packet out counter
             
 
-def CheckFlowExist_DB(String key, dict db): #Flow entry in DB ?
+def CheckFlowExist_DB(flow_id, db): #Flow entry in DB ?
     #To check if DB has this flow record
     if(flow_id in db = True):
-        UpdateData(db）#更新timestamp
+        db[flow_id].timestamp.append(time.time())#更新timestamp
+        print("Flow found in DB,updating time")
+        return db
     else:
         #Add record to DB
         db[flow_id] = db_content()#能否用hash當key存？
         db[flow_id].timestamp.append(time.time()) #添加新的時間記錄
+        packet_count += 1
+        #cancel installation & handle packet by cp & update packet out counter
+        return db
 
 
-def UpdateData(dict db,float flow_id, float idle_timeout = 7.0): #更新Time Stamp以及idle_timeout
+def UpdateData(dict db,float flow_id, float idle_timeout = 7.0): #当Removal时，更新Time Stamp以及idle_timeout 
     db[flow_id].idle_timeout.append(idle_timeout)  #若沒有帶值進來，則使用預設7s
     db[flow_id].timestamp.append(time.time())      #記錄最近Time Stamp
 
@@ -160,6 +165,9 @@ def ProcessingRemovalMessage(dict db, float flow_id, float duration, int packet_
         #update data to db
         UpdateData(db, flow_id, new_timeout)
 
+def RemovalMessage(flow_id, Switch):
+    return Switch[flow_id].duration, Switch[flow_id].packet_count
+
 #------------------------------------------------
 #                                               #
 #                   Part 3                      #
@@ -213,16 +221,27 @@ def ExpireEvent(Current_time):
 if __name__ == '__main__':
 
 while(Current_time < Sim_time):
+    #get data from timeline queue
     ts , p = heappop(timeline)
 
     #update  current time
-
+    Current_time = ts
 
     #Do sth
+    #Check DB Size
+    CheckDB(db)
 
     #update event
     if p.event_type == "arrvial":
         heappush(timeline, (ts + np.random.exponential(1), #对应obj)
+        flow_id = PacketProcessing(p)
+        #update flow_id 
+        db = CheckFlowExist_DB(flow_id,db)
+        #check if exist in db & update timestamp & maintain packet-out counter @ controller
+
+
+
+
     if p.event_type == "install":
         heappush(timeline, (ts + np.random.exponential(1), #对应obj)
     if p.event_type == "expire":
