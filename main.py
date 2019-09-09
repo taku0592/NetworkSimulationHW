@@ -18,7 +18,7 @@ from heapq import heappush, heappop
 #
 #
 #
-class packet:
+class Packet:
     def __init__(self):
         self.SrcIP      = None # 5 tuple - SrcIP
         self.DstIP      = None # 5 tuple - DstIP
@@ -32,15 +32,16 @@ class packet:
 class Switch_TCAM:
     def __init__(self):
         self.flow_id        = None
-        self.timestamp      = None
+        self.first_timestamp      = None
+        self.last_timestamp      = None
         self.idle_timeout   = None
         self.packet_count   = None
         self.duration       = None
 
-Switch = {}
+switch = {}
 
 
-class db_content:
+class Db_content:
     def __init__(self):
             self.timestamp    = list()
             self.idle_timeout = list()
@@ -52,78 +53,84 @@ db = {} # db init as dict
 #------------------------------------------------
 #       Places to Declare Variable              #
 #------------------------------------------------
-db_threshold = 5000 #key的數量設定爲5000
-Packet_out   = 0      #一共處理了多少封包
-TCAM_Max     = 2000     #TCAM能存儲2000條Flow_entries
-TCAM_Current = 0    #目前TCAM的佔用情況
-Current_time = 0
-Sim_time     = 30*60 # 30 min
-timeline = [] #queue for schedule
+db_threshold = 5000   #set maximum # of db size as 5000
+packet_out   = 0      #maintain system load counter
+tcam_max     = 2000   #set upper bound of tcam size
+tcam_current = 0      #current tcam status
+current_time = 0
+sim_time     = 30*60  #simnulation time
+timeline = []         #queue for schedule
+default_idle_timeout = 7
+confident_range = 0.9
 #-----------------------------------------------#
 #                                               #
 #                 Part 1 & 2                    #
 #                     CP                        #
 #-----------------------------------------------#
-def PacketProcessing(packet):
-    #取出封包中的欄位 --> SrcIP + DstIP 做HASH
+def packet_processing(Packet):
+    #get packet detail as flow_id --> SrcIP + DstIP --> HASH
     flow_id = (packet.SrcIP, packet.DstIP, packet.SrcPort, packet.DstPort, packet.Priority, packet.event_type)
     #Set SrcIP, DstIP, SrcPort, DstPort, Priority, Event_type as flow_id
     return flow_id
     
 
-def LRU(dict db):
+def lru(db,time):
     #Sorting according to last_timestamp
     #Delete least recently use record from db
     #return db after deletion
     flow_id = sorted(db,lambda x:db[x].timestamp[-1])[0] # get flow_id
+    print("Flow_id to delete: ", flow_id," idle for: ", (time - db[flow_id].timestamp[-1]))
     del db[flow_id]
-    return db
+    #return db
 
 
-def CheckDB(dict db):
-    #DB size > threshold ?
-    if(db.size() > db_threshold):
-        db = LRU(db)
-        CheckDB(db)
-        #检查DB空间直到符合要求
+def checkDB(db):
+    #DB size > threshold?
+    if(len(db) > db_threshold):
+        lru(db)
+        checkDB(db)
+        
+        #check db space till it meets the requirement
         print("Checking DB Size...")
 
             
 
-def CheckFlowExist_DB(flow_id, db): #Flow entry in DB ?
+def checkFlowExist_DB(flow_id, db, time): #Flow entry in DB ?
     #To check if DB has this flow record
-    if(flow_id in db = True):
-        db[flow_id].timestamp.append(time.time())#更新timestamp
-        print("Flow found in DB,updating time")
-        return db
+    if(flow_id in db): #if exist
+        db[flow_id].timestamp.append(time)#update timestamp
+        print("Flow found in DB, time updated")
+        #return db
     else:
         #Add record to DB
-        db[flow_id] = db_content()#能否用hash當key存？
-        db[flow_id].timestamp.append(time.time()) #添加新的時間記錄
-        packet_count += 1
+        db[flow_id] = db_content() #flow_id as key, db_content as value
+        db[flow_id].timestamp.append(time) #add new time data
+        db[flow_id].idle_timeout = default_idle_timeout#update idle timeout for the first time
+        packet_out = packet_out + 1
         #cancel installation & handle packet by cp & update packet out counter
-        return db
+        #return db
 
 
-def UpdateData(dict db,float flow_id, float idle_timeout = 7.0): #当Removal时，更新Time Stamp以及idle_timeout 
-    db[flow_id].idle_timeout.append(idle_timeout)  #若沒有帶值進來，則使用預設7s
-    db[flow_id].timestamp.append(time.time())      #記錄最近Time Stamp
+def updateData(db, flow_id, idle_timeout = 7.0, time): #when removal occur,updating time stamp & idle_timeout
+    db[flow_id].idle_timeout.append(idle_timeout)  #if idle_timeout does not receive, append 7 as idle timeout
+    db[flow_id].timestamp.append(time)      #update last time stamp
 
-def CheckInterval(db, flow_id，Switch):
+def checkInterval(db, flow_id, switch, time):
     tmp = db[flow_id].timestamp[len(db[flow_id].timestamp) - 1] #get last time stamp
     print("Checking Interval : ", tmp)
     
-    if(time.time() - tmp < 11):
+    if(time - tmp < 11): 
         #meet the requirement of interval & proceed to install 
-        while(TCAM_Current >= TCAM_Max - 1 ):
-            #這條插入後會導致滿，則進行刪除
-            TCAM_Current = DeleteFlowEntry(db, TCAM_Current)
-            #Keep checking row 118-120 to make sure tcam size sufficient
-        TCAM_Current = TCAM_Current + 1
-        Switch[flow_id].timestamp    = time.time()
-        Switch[flow_id].packet_count = 0 #reset as 0
-        Switch[flow_id].duration     = 0
-        Switch[flow_id].idle_timeout = db[flow_id].idle_timeout[-1]#拿db中对应的idle_timeout中的最后一个记录
+        while(tcam_current >= tcam_max - 1 ):
+            #if tcam gets full after installation, execute delete process
+            tcam_current = deleteFlowEntry(db, tcam_current)
+            #Keep checking row 121-126 to make sure tcam size sufficient
+        #out of while loop, tcam space is suffcient, execute install process
+        tcam_current = tcam_current + 1
+        switch[flow_id].timestamp    = time
+        switch[flow_id].packet_count = 0 #init as 0
+        switch[flow_id].duration     = None #init as None
+        switch[flow_id].idle_timeout = db[flow_id].idle_timeout[-1]#set idle_timeout from db[flow_id].idle_timeout[-1]
         db[flow_id].active_flag      = True
 
         # if(TCAM_Current < TCAM_Max):
@@ -141,26 +148,26 @@ def CheckInterval(db, flow_id，Switch):
             
 
     else:
-        print("Cancel installaion of :"flow_id) #Print出取消插入的flow id
+        print("Cancel installaion of : ", flow_id) #Print the flow id since cancalation
 
-def DeleteFlowEntry(dict db, int TCAM_Current): # it seems is the same as LRU function
+def deleteFlowEntry(db, tcam_current): # it seems is the same as LRU function
     #找到DB中有active flag之最不常用的flow
     #需要根據timestamp排序，剔除最後的記錄
     #找到要删除的条目
-    Target = sorted(db,lambda x:db[x].timestamp[-1])[0]
-    del db[Target]
-    TCAM_Current = len(db)
-    return TCAM_Current, db
+    target = sorted(db,lambda x:db[x].timestamp[-1])[0]
+    del db[target]
+    tcam_current = len(db)
+    return tcam_current, db
 
-def ProcessingRemovalMessage(dict db, float flow_id, float duration, int packet_count):
+def processingRemovalMessage(db, flow_id, duration, packet_count, time):
     #update time stamp
-    db[flow_id].timestamp.append(time.time())
+    db[flow_id].timestamp.append(time)
     #mark flow as inactive
     db[flow_id].active_flag = False
     #free tcam spaces
-    TCAM_Current = TCAM_Current - 1 
+    tcam_current = tcam_current - 1 
     #Calculate time interval based last two timestamp
-    interval = db[flow_id].timestamp(len(db[flow_id].timestamp) - 1) - db[flow_id].timestamp(len(db[flow_id].timestamp) - 2)
+    interval = db[flow_id].timestamp[len(db[flow_id].timestamp) - 1] - db[flow_id].timestamp[len(db[flow_id].timestamp) - 2]
     #update interval
     db[flow_id].interval.append(interval)
 
@@ -170,29 +177,36 @@ def ProcessingRemovalMessage(dict db, float flow_id, float duration, int packet_
         mean     = statistics.mean(db[flow_id].interval)
         #Calculate variance through interval list
         vairance = statistics.variance(db[flow_id].interval)
+        stdev    = statistics.stdev(db[flow_id].interval)
         #get new idle timeout through 柴比雪夫
-        new_timeout = Chebyshev(mean, variance)
+        new_timeout = chebyshev(mean, stdev)
         #update data to db
         db[flow_id].interval.clear()
         #Clear interval list
-        UpdateData(db, flow_id, new_timeout)
+        updateData(db, flow_id, new_timeout)
 
-def Chebyshev(mean, variance){
-    
+def chebyshev(mean, stdev, db, confident_range):
+    k = math.sqrt(1/1-confident_range)
+    result = mean + (k * stdev)
+    return result
 
-}
 
-
-def RemovalMessage(flow_id, Switch):
-    return Switch[flow_id].duration, Switch[flow_id].packet_count
+def removalMessage(flow_id, switch):
+    return switch[flow_id].duration, Switch[flow_id].packet_count
 
 #------------------------------------------------
 #                                               #
 #                   Part 3                      #
 #                   Switch                      #
 #------------------------------------------------
-def CheckFlowExist_SW(dict db):
+def checkFlowExist_SW(switch, flow_id, time):
     #do sth here
+    if(flow_id in switch):
+        switch[flow_id].packet_count   = switch[flow_id].packet_count + 1
+        switch[flow_id].last_timestamp = time
+        switch[flow_id].duration       = time - switch[flow_id].last_timestamp
+    else:
+        install_Rule(flow_id, switch)
 
 #class Switch_TCAM:
 #    def __init__(self):
@@ -200,32 +214,33 @@ def CheckFlowExist_SW(dict db):
 #       self.packet_count   = None
 #       self.duration       = None
 
-def Install_Rule(tuple flow_id,class packet):
-    Switch[flow_id]              = Switch_TCAM()
-    Switch[flow_id].timestamp    = time.time()
-    Switch[flow_id].packet_count = 0  # init as 0
-    Switch[flow_id].duration     = -1 # init as -1
+def install_Rule(flow_id, switch):
+    switch[flow_id]                   = Switch_TCAM()
+    switch[flow_id].first_timestamp   = time
+    switch[flow_id].last_timestamp    = time
+    switch[flow_id].packet_count      = 0  # init as 0
+    switch[flow_id].duration          = None # init as -1
     
-def Del_Rule(dict Switch, int TCAM_Max):
-    TCAM_current = len(Switch)
+def del_Rule(switch, tcam_max):
+    tcam_current = len(switch)
     
-    if(TCAM_Current >= TCAM_Max):
+    if(tcam_current >= tcam_max):
         # TCAM Overflow occur
-        Switch = LRU(Switch)
-        TCAM_Current = len(Switch)
+        switch = lru(Switch)
+        tcam_current = len(switch)
         #sorted by timestamps & find flow id to delete
         
         #不用接，直接对字典进行操作
     
-        return Switch, TCAM_Current
+        return switch, tcam_current
 
     else:
 
-        return Switch, TCAM_Current
+        return switch, tcam_current
 #---------------------------------------------------------------------
-TCAM_Current = len(Switch)
-while(TCAM_current >= TCAM_Max):
-    Switch,TCAM_Current = Del_Rule(Switch, TCAM_Max)
+# TCAM_Current = len(Switch)
+# while(TCAM_current >= TCAM_Max):
+#     Switch,TCAM_Current = Del_Rule(Switch, TCAM_Max)
 #---------------------------------------------------------------------
 
 
