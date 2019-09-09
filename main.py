@@ -167,13 +167,21 @@ def ProcessingRemovalMessage(dict db, float flow_id, float duration, int packet_
     #check if len(interval) >= 6 --->Threshold 3
     if(len(db[flow_id].interval) >= 6):
         #calculate mean through interval list
-        mean = statistics.mean(db[flow_id].interval)
+        mean     = statistics.mean(db[flow_id].interval)
         #Calculate variance through interval list
         vairance = statistics.variance(db[flow_id].interval)
         #get new idle timeout through 柴比雪夫
         new_timeout = Chebyshev(mean, variance)
         #update data to db
+        db[flow_id].interval.clear()
+        #Clear interval list
         UpdateData(db, flow_id, new_timeout)
+
+def Chebyshev(mean, variance){
+    
+
+}
+
 
 def RemovalMessage(flow_id, Switch):
     return Switch[flow_id].duration, Switch[flow_id].packet_count
@@ -226,6 +234,8 @@ while(TCAM_current >= TCAM_Max):
 if __name__ == '__main__':
 
 #init
+
+
 ##arrival event
 packet_arrival = packet()
 Src_ip, Dst_ip = random.sample(IP_List,2) #从list中抓两个ip出来
