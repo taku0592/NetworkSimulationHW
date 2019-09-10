@@ -2,6 +2,9 @@
 import statistics
 import math
 from heapq import heappush, heappop
+import statistics
+import ipaddress
+import random
 #--------------------------------------------------
 #**Part 1:**
 #1:Check DB Size + LRU DB Management
@@ -17,7 +20,7 @@ from heapq import heappush, heappop
 #
 #
 #
-#
+#-------------------------------------------------
 class Packet:
     def __init__(self):
         self.SrcIP      = None # 5 tuple - SrcIP
@@ -49,6 +52,46 @@ class Db_content:
             self.active_flag  = None
 
 db = {} # db init as dict
+#-------------------------------------------------
+#Event Class
+#-------------------------------------------------
+class Event():
+    def __init__(self, __type):
+        self.type = __type
+    def __str__(self):
+        print(self.type)
+
+class Session():
+    def __init__(self, srcIP=None, dstIP=None, priority=None, srcPort=None, dstPort=None, protocol=None):
+        super().__init__('Session')
+        self.srcIP    = srcIP
+        self.dstIP    = dstIP
+        self.priority = priority
+        self.srcPort  = srcPort
+        self.dstPort  = dstPort
+        self.protocol = protocol
+
+class Arrival(Event):
+    def __init__(self, session_or_arrival):
+        assert isinstance(session_or_arrival, Session) or isinstance(session_or_arrival, Arrival) #check if input(session or arrival is Session or Arrival)
+        self.srcIP      = session_or_arrival.srcIP
+        self.dstIP      = session_or_arrival.dstIP
+        self.priority   = session_or_arrival.priority
+        self.srcPort    = session_or_arrival.srcPort
+        self.dstPort    = session_or_arrival.dstPort
+        self.protocol   = session_or_arrival.protocol
+
+class Install(Event):
+    def __init__(self):
+        super().__init__('Install')
+
+class Expire(Event):
+    def __init__(self):
+        super().__init__('Expire')
+
+class Monitor(Event): #schedule itself per second
+    def __init__(self):
+        super().__init__('Monitor')
 
 #------------------------------------------------
 #       Places to Declare Variable              #
@@ -67,6 +110,18 @@ confident_range = 0.9
 #                 Part 1 & 2                    #
 #                     CP                        #
 #-----------------------------------------------#
+
+def generate_ipv4():
+    bits     = random.getrandbits(32)       # generates an integer with 32 random bits
+    addr     = ipaddress.IPv4Address(bits)  # instances an Ipv4 addr from those bits
+    addr_str = str(addr)                    # convert it to str
+    subnet   = ['140','116']
+    subnet.extend(addr_str.split('.')[2:])
+    addr_str = str('.'.join(subnet))
+
+    return addr_str
+
+
 def packet_processing(Packet):
     #get packet detail as flow_id --> SrcIP + DstIP --> HASH
     flow_id = (packet.SrcIP, packet.DstIP, packet.SrcPort, packet.DstPort, packet.Priority, packet.event_type)
@@ -150,14 +205,14 @@ def checkInterval(db, flow_id, switch, time):
     else:
         print("Cancel installaion of : ", flow_id) #Print the flow id since cancalation
 
-def deleteFlowEntry(db, tcam_current): # it seems is the same as LRU function
-    #找到DB中有active flag之最不常用的flow
-    #需要根據timestamp排序，剔除最後的記錄
-    #找到要删除的条目
-    target = sorted(db,lambda x:db[x].timestamp[-1])[0]
-    del db[target]
-    tcam_current = len(db)
-    return tcam_current, db
+def deleteFlowEntry(tcam, tcam_current): # it seems is the same as LRU function
+    #find least used rule in tcam 
+    #sort with timestamp, get flow_id
+    target = sorted(tcam,lambda x:tcam[x].timestamp[-1])[0]
+    print("flow to delete in tcam: ",target)
+    del tcam[target]
+    tcam_current = len(tcam)
+    return tcam_current, tcam
 
 def processingRemovalMessage(db, flow_id, duration, packet_count, time):
     #update time stamp
@@ -178,7 +233,7 @@ def processingRemovalMessage(db, flow_id, duration, packet_count, time):
         #Calculate variance through interval list
         vairance = statistics.variance(db[flow_id].interval)
         stdev    = statistics.stdev(db[flow_id].interval)
-        #get new idle timeout through 柴比雪夫
+        #get new idle timeout through chebyshev
         new_timeout = chebyshev(mean, stdev)
         #update data to db
         db[flow_id].interval.clear()
@@ -243,50 +298,26 @@ def del_Rule(switch, tcam_max):
 #     Switch,TCAM_Current = Del_Rule(Switch, TCAM_Max)
 #---------------------------------------------------------------------
 
+def next_session(priority = 1):
+    s = Session()
+    s.srcIP     = generate_ipv4()
+    s.dstIP     = generate_ipv4()
+    s.srcPort   = 1111
+    s.dstPort   = 1111
+    s.protocol  = 0x800
 
 
 
-if __name__ == '__main__':
-
-#init
-
-
-##arrival event
-packet_arrival = packet()
-Src_ip, Dst_ip = random.sample(IP_List,2) #从list中抓两个ip出来
-Port           = random.sample(Port_list,1) #从list中抓port出来，list期望存常用port
-Protocol       = random.sample(Protocol_list,1)
-Priority       = random.sample(Priority_list,1)
-
-packet_arrival.SrcIP      = Src_ip
-packet_arrival.DstIP      = Dst_ip
-packet_arrival.SrcPort    = Port
-packet_arrival.DstPort    = Port
-packet_arrival.Priority   = Priority
-packet_arrival.Protocol   = Protocol
-packet_arrival.event_type = "arrival"
-
-##install event ---> schedule expire event
-packet_install              = Switch_TCAM()
-packet_install.flow_id      = (packet_arrival.SrcIP, packet_arrival.DstIP, packet_arrival.SrcPort, packet_arrival.DstPort, packet_arrival.Protocol, packet_arrival.Priority)
-#store as tuple
-packet_install.idle_timeout = db[packet_install.flow_id].idle_timeout[-1]
-packet_install.packet_count = 0
-packet_install.timestamp    = time.time()
-packet_install.duration     = db[flow_id].timestamp[-1] - db[flow_id].timestamp[-2] #calculating time stamp 有疑惑
-packet_install.event_type   = "install"
-
-##expire event ---> schedule for nothing
-packet_expire               = Switch_TCAM()
-
-packet_expire.flow_id       = packet_install.flow_id
-packet_expire.duration      = Switch[packet_expire.flow_id].duration
-packet_expire.idle_timeout  = Switch[packet_expire.flow_id].idle_timeout
-packet_expire.packet_count  = Switch[packet_expire.flow_id].packet_count
-packet_expire.timestamp #it seems unnecessary
+timeline = []
+current_time = 0
 
 
-while(Current_time < Sim_time):
+##init event
+event_a = Arrival()
+heappush(timeline, (0 + np.random.exponential(1), event_a))
+
+
+while(current_time < sim_time):
     #get data from timeline queue
     ts , p = heappop(timeline)
 
@@ -298,9 +329,9 @@ while(Current_time < Sim_time):
     CheckDB(db)
 
     #update event
-    if p.event_type == "arrvial":
+    if p.event_type == "arrival":
         
-        heappush(timeline, (ts + np.random.exponential(1), #对应obj(schedule new arrvial))
+        heappush(timeline, (ts + np.random.exponential(1),p) #对应obj(schedule new arrival))
         #schedule next event
         flow_id = PacketProcessing(p)
         #update flow_id 
