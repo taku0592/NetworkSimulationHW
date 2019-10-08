@@ -29,7 +29,7 @@ class Packet:
         self.SrcPort    = None # 5 tuple - SrcPort
         self.DstPort    = None # 5 tuple - DstPort
         self.Protocol   = None # 5 tuple - Protocol
-        self.event_type = "arrival"
+        self.event_type = "Arrival"
 
 
 class Switch_TCAM:
@@ -298,6 +298,8 @@ def del_Rule(switch, tcam_max):
 #     Switch,TCAM_Current = Del_Rule(Switch, TCAM_Max)
 #---------------------------------------------------------------------
 
+
+''' 
 def next_session(priority = 1):
     s = Session()
     s.srcIP     = generate_ipv4()
@@ -305,7 +307,7 @@ def next_session(priority = 1):
     s.srcPort   = 1111
     s.dstPort   = 1111
     s.protocol  = 0x800
-
+'''
 
 
 timeline = []
@@ -331,7 +333,7 @@ while(current_time < sim_time):
     #update event
     if p.event_type == "arrival":
         
-        heappush(timeline, (ts + np.random.exponential(1),p) #对应obj(schedule new arrival))
+        heappush(timeline, (ts + np.random.exponential(1),p)) #对应obj(schedule new arrival))
         #schedule next event
         flow_id = PacketProcessing(p)
         #update flow_id 
